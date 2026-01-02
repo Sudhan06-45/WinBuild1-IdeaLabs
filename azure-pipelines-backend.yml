@@ -25,8 +25,10 @@ pool:
 
 variables:
   - group: sqa-backend-vars
-  backendAppName: 'SQA-Mangement-backend'
-  pythonVersion: '3.11'
+  - name: backendAppName
+    value: 'SQA-Mangement-backend'
+  - name: pythonVersion
+    value: '3.11'
 
 stages:
   # ============================================
