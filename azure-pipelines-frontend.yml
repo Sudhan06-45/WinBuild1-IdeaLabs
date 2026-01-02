@@ -124,16 +124,13 @@ stages:
                     Write-Host "##vso[task.setvariable variable=publishPassword;issecret=true]$password"
                   displayName: 'Extract Publish Profile Password'
 
-                - task: AzureWebApp@1
+                - task: AzureRmWebAppDeployment@4
                   inputs:
-                    azureSubscription: ''
-                    appType: 'webAppLinux'
-                    appName: 'SQA-Management-frontend'
-                    package: '$(Pipeline.Workspace)/frontend-drop/frontend-*.zip'
-                    deploymentMethod: 'zipDeploy'
-                  env:
-                    AZURE_WEB_APP_PUBLISH_PROFILE: '$(Build.SourcesDirectory)\frontend-publishprofile.xml'
-                    AZURE_WEB_APP_PUBLISH_PASSWORD: '$(publishPassword)'
+                    ConnectionType: 'PublishProfile'
+                    PublishProfilePath: '$(Build.SourcesDirectory)\frontend-publishprofile.xml'
+                    PublishProfilePassword: '$(publishPassword)'
+                    WebAppName: 'SQA-Management-frontend'
+                    packageForLinux: '$(Pipeline.Workspace)\frontend-drop\frontend-*.zip'
                   displayName: 'Deploy Frontend using Publish Profile'
 
                 - powershell: |
