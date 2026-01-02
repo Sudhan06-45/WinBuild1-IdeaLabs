@@ -119,30 +119,15 @@ stages:
                     downloadPath: '$(Pipeline.Workspace)'
                   displayName: 'Download Artifacts'
 
-                - powershell: |
-                    $profilePath = "$(Pipeline.Workspace)\profiles\backend-publishprofile.xml"
-                    New-Item -ItemType Directory -Path (Split-Path $profilePath) -Force | Out-Null
-                    # Decode base64
-                    $base64 = "$(backendPublishProfileBase64)"
-                    $decodedBytes = [System.Convert]::FromBase64String($base64)
-                    $decodedString = [System.Text.Encoding]::UTF8.GetString($decodedBytes)
-                    [System.IO.File]::WriteAllText($profilePath, $decodedString)
-                    Write-Host "Profile created successfully"
-                  displayName: 'Create Publish Profile from Base64'
-
                 - task: AzureRmWebAppDeployment@4
                   inputs:
                     ConnectionType: 'PublishProfile'
-                    PublishProfilePath: '$(Pipeline.Workspace)\profiles\backend-publishprofile.xml'
-                    PublishProfilePassword: '$(backendPublishProfilePassword)'
+                    PublishProfilePath: '$(Build.SourcesDirectory)\backend-publishprofile.xml'
                     PackageForLinux: '$(Pipeline.Workspace)\backend-drop\backend-*.zip'
-                    WebAppName: '$(backendAppName)'
                   displayName: 'Deploy Backend using Publish Profile'
 
                 - powershell: |
                     Write-Host "==== BACKEND DEPLOYMENT COMPLETE ===="
                     Write-Host "Backend URL: https://$(backendAppName).azurewebsites.net"
-                    Write-Host "API Docs: https://$(backendAppName).azurewebsites.net/docs"
-                    Write-Host "Health: https://$(backendAppName).azurewebsites.net/health"
                   displayName: 'Verify Backend Deployment'
                   continueOnError: true

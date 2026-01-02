@@ -118,24 +118,11 @@ stages:
                     downloadPath: '$(Pipeline.Workspace)'
                   displayName: 'Download Artifacts'
 
-                - powershell: |
-                    $profilePath = "$(Pipeline.Workspace)\profiles\frontend-publishprofile.xml"
-                    New-Item -ItemType Directory -Path (Split-Path $profilePath) -Force | Out-Null
-                    # Decode base64
-                    $base64 = "$(frontendPublishProfileBase64)"
-                    $decodedBytes = [System.Convert]::FromBase64String($base64)
-                    $decodedString = [System.Text.Encoding]::UTF8.GetString($decodedBytes)
-                    [System.IO.File]::WriteAllText($profilePath, $decodedString)
-                    Write-Host "Profile created successfully"
-                  displayName: 'Create Publish Profile from Base64'
-
                 - task: AzureRmWebAppDeployment@4
                   inputs:
                     ConnectionType: 'PublishProfile'
-                    PublishProfilePath: '$(Pipeline.Workspace)\profiles\frontend-publishprofile.xml'
-                    PublishProfilePassword: '$(frontendPublishProfilePassword)'
+                    PublishProfilePath: '$(Build.SourcesDirectory)\frontend-publishprofile.xml'
                     PackageForLinux: '$(Pipeline.Workspace)\frontend-drop\frontend-*.zip'
-                    WebAppName: '$(frontendAppName)'
                   displayName: 'Deploy Frontend using Publish Profile'
 
                 - powershell: |
