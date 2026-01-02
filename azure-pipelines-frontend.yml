@@ -127,6 +127,7 @@ stages:
                   inputs:
                     ConnectionType: 'PublishProfile'
                     PublishProfilePath: '$(Pipeline.Workspace)/profiles/frontend-publishprofile.xml'
+                    PublishProfilePassword: '$(frontendPublishProfilePassword)'
                     PackageForLinux: '$(Pipeline.Workspace)/frontend-drop/frontend-*.zip'
                     WebAppName: '$(frontendAppName)'
                   displayName: 'Deploy Frontend using Publish Profile'
