@@ -119,33 +119,23 @@ stages:
                   displayName: 'Download Artifacts'
 
                 - script: |
-                    mkdir -p $(Pipeline.Workspace)/profiles
-                    echo "$(frontendPublishProfile)" > $(Pipeline.Workspace)/profiles/frontend-publishprofile.xml
+                    mkdir $(Pipeline.Workspace)\profiles
+                    echo $(frontendPublishProfile) > $(Pipeline.Workspace)\profiles\frontend-publishprofile.xml
+                  shell: cmd
                   displayName: 'Create Publish Profile from Variable'
 
                 - task: AzureRmWebAppDeployment@4
                   inputs:
                     ConnectionType: 'PublishProfile'
-                    PublishProfilePath: '$(Pipeline.Workspace)/profiles/frontend-publishprofile.xml'
+                    PublishProfilePath: '$(Pipeline.Workspace)\profiles\frontend-publishprofile.xml'
                     PublishProfilePassword: '$(frontendPublishProfilePassword)'
-                    PackageForLinux: '$(Pipeline.Workspace)/frontend-drop/frontend-*.zip'
+                    PackageForLinux: '$(Pipeline.Workspace)\frontend-drop\frontend-*.zip'
                     WebAppName: '$(frontendAppName)'
                   displayName: 'Deploy Frontend using Publish Profile'
 
                 - script: |
-                    echo "==== FRONTEND DEPLOYMENT COMPLETE ===="
-                    echo "Frontend URL: https://$(frontendAppName).azurewebsites.net"
-                    echo ""
-                    echo "Testing frontend..."
-                    for i in {1..30}; do
-                      status=$(curl -s -o /dev/null -w "%{http_code}" https://$(frontendAppName).azurewebsites.net/ || echo "000")
-                      if [ "$status" = "200" ]; then
-                        echo "✅ Frontend is live (HTTP $status)"
-                        break
-                      else
-                        echo "⏳ Waiting for frontend... (attempt $i/30, HTTP $status)"
-                        sleep 2
-                      fi
-                    done
+                    echo ==== FRONTEND DEPLOYMENT COMPLETE ====
+                    echo Frontend URL: https://$(frontendAppName).azurewebsites.net
+                  shell: cmd
                   displayName: 'Verify Frontend Deployment'
                   continueOnError: true

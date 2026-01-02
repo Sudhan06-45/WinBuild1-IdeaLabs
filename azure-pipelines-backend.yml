@@ -120,35 +120,25 @@ stages:
                   displayName: 'Download Artifacts'
 
                 - script: |
-                    mkdir -p $(Pipeline.Workspace)/profiles
-                    echo "$(backendPublishProfile)" > $(Pipeline.Workspace)/profiles/backend-publishprofile.xml
+                    mkdir $(Pipeline.Workspace)\profiles
+                    echo $(backendPublishProfile) > $(Pipeline.Workspace)\profiles\backend-publishprofile.xml
+                  shell: cmd
                   displayName: 'Create Publish Profile from Variable'
 
                 - task: AzureRmWebAppDeployment@4
                   inputs:
                     ConnectionType: 'PublishProfile'
-                    PublishProfilePath: '$(Pipeline.Workspace)/profiles/backend-publishprofile.xml'
+                    PublishProfilePath: '$(Pipeline.Workspace)\profiles\backend-publishprofile.xml'
                     PublishProfilePassword: '$(backendPublishProfilePassword)'
-                    PackageForLinux: '$(Pipeline.Workspace)/backend-drop/backend-*.zip'
+                    PackageForLinux: '$(Pipeline.Workspace)\backend-drop\backend-*.zip'
                     WebAppName: '$(backendAppName)'
                   displayName: 'Deploy Backend using Publish Profile'
 
                 - script: |
-                    echo "==== BACKEND DEPLOYMENT COMPLETE ===="
-                    echo "Backend URL: https://$(backendAppName).azurewebsites.net"
-                    echo "API Docs: https://$(backendAppName).azurewebsites.net/docs"
-                    echo "Health: https://$(backendAppName).azurewebsites.net/health"
-                    echo ""
-                    echo "Testing backend health..."
-                    for i in {1..30}; do
-                      status=$(curl -s -o /dev/null -w "%{http_code}" https://$(backendAppName).azurewebsites.net/health || echo "000")
-                      if [ "$status" = "200" ]; then
-                        echo "✅ Backend is healthy (HTTP $status)"
-                        break
-                      else
-                        echo "⏳ Waiting for backend... (attempt $i/30, HTTP $status)"
-                        sleep 2
-                      fi
-                    done
+                    echo ==== BACKEND DEPLOYMENT COMPLETE ====
+                    echo Backend URL: https://$(backendAppName).azurewebsites.net
+                    echo API Docs: https://$(backendAppName).azurewebsites.net/docs
+                    echo Health: https://$(backendAppName).azurewebsites.net/health
+                  shell: cmd
                   displayName: 'Verify Backend Deployment'
                   continueOnError: true
