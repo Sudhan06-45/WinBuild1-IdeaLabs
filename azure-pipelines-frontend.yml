@@ -121,11 +121,17 @@ stages:
                 - powershell: |
                     $profilePath = "$(Pipeline.Workspace)\profiles\frontend-publishprofile.xml"
                     New-Item -ItemType Directory -Path (Split-Path $profilePath) -Force | Out-Null
-                    $profileContent = @"
-                    $(frontendPublishProfile)
-                    "@
-                    [System.IO.File]::WriteAllText($profilePath, $profileContent.Trim())
-                    Write-Host "Profile created at: $profilePath"
+                    # Get from environment variable to avoid special character issues
+                    $profile = $env:PUBLISH_PROFILE
+                    if ($profile) {
+                      [System.IO.File]::WriteAllText($profilePath, $profile)
+                      Write-Host "Profile created successfully"
+                    } else {
+                      Write-Error "Profile content not found in environment"
+                      exit 1
+                    }
+                  env:
+                    PUBLISH_PROFILE: $(frontendPublishProfile)
                   displayName: 'Create Publish Profile from Variable'
 
                 - task: AzureRmWebAppDeployment@4
