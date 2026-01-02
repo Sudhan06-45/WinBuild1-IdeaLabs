@@ -25,9 +25,8 @@ pool:
 
 variables:
   frontendAppName: 'SQA-Management-frontend'
-  resourceGroup: 'sqa-management-rg'
-  azureSubscription: 'Azure-SQA-Connection'
   nodeVersion: '20.x'
+  - group: sqa-backend-vars
 
 stages:
   # ============================================
@@ -117,45 +116,18 @@ stages:
                     downloadPath: '$(Pipeline.Workspace)'
                   displayName: 'Download Artifacts'
 
-                - task: AzureWebApp@1
-                  inputs:
-                    azureSubscription: '$(azureSubscription)'
-                    appType: 'webAppLinux'
-                    appName: '$(frontendAppName)'
-                    package: '$(Pipeline.Workspace)/frontend-drop/frontend-*.zip'
-                    deploymentMethod: 'zipDeploy'
-                    appSettings: |
-                      -WEBSITES_ENABLE_APP_SERVICE_STORAGE false
-                      -NODE_ENV production
-                  displayName: 'Deploy Frontend - Zip Deploy'
+                - script: |
+                    mkdir -p $(Pipeline.Workspace)/profiles
+                    echo "$(frontendPublishProfile)" > $(Pipeline.Workspace)/profiles/frontend-publishprofile.xml
+                  displayName: 'Create Publish Profile from Variable'
 
-                - task: AzureAppServiceSettings@1
+                - task: AzureRmWebAppDeployment@4
                   inputs:
-                    azureSubscription: '$(azureSubscription)'
-                    appName: '$(frontendAppName)'
-                    resourceGroupName: '$(resourceGroup)'
-                    appSettings: |
-                      [
-                        {
-                          "name": "WEBSITES_ENABLE_APP_SERVICE_STORAGE",
-                          "value": "false",
-                          "slotSetting": false
-                        },
-                        {
-                          "name": "NODE_ENV",
-                          "value": "production",
-                          "slotSetting": false
-                        }
-                      ]
-                  displayName: 'Configure Application Settings'
-
-                - task: AzureAppServiceManage@0
-                  inputs:
-                    azureSubscription: '$(azureSubscription)'
-                    appType: 'webAppLinux'
-                    appName: '$(frontendAppName)'
-                    action: 'Restart App Service'
-                  displayName: 'Restart Frontend App'
+                    ConnectionType: 'PublishProfile'
+                    PublishProfilePath: '$(Pipeline.Workspace)/profiles/frontend-publishprofile.xml'
+                    PackageForLinux: '$(Pipeline.Workspace)/frontend-drop/frontend-*.zip'
+                    WebAppName: '$(frontendAppName)'
+                  displayName: 'Deploy Frontend using Publish Profile'
 
                 - script: |
                     echo "==== FRONTEND DEPLOYMENT COMPLETE ===="

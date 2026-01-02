@@ -24,11 +24,9 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  - group: sqa-backend-vars
   backendAppName: 'SQA-Mangement-backend'
-  resourceGroup: 'sqa-management-rg'
-  azureSubscription: 'Azure-SQA-Connection'
   pythonVersion: '3.11'
+  - group: sqa-backend-vars
 
 stages:
   # ============================================
@@ -119,99 +117,18 @@ stages:
                     downloadPath: '$(Pipeline.Workspace)'
                   displayName: 'Download Artifacts'
 
-                - task: AzureWebApp@1
-                  inputs:
-                    azureSubscription: '$(azureSubscription)'
-                    appType: 'webAppLinux'
-                    appName: '$(backendAppName)'
-                    package: '$(Pipeline.Workspace)/backend-drop/backend-*.zip'
-                    deploymentMethod: 'zipDeploy'
-                    appSettings: |
-                      -WEBSITES_ENABLE_APP_SERVICE_STORAGE false
-                      -SCM_DO_BUILD_DURING_DEPLOYMENT true
-                      -PYTHON_ENABLE_GUNICORN_ONLY true
-                      -PYTHON_VERSION 3.11
-                      -AZURE_SQL_SERVER $(AZURE_SQL_SERVER)
-                      -AZURE_SQL_DATABASE $(AZURE_SQL_DATABASE)
-                      -AZURE_SQL_USERNAME $(AZURE_SQL_USERNAME)
-                      -AZURE_SQL_PASSWORD $(AZURE_SQL_PASSWORD)
-                      -AZURE_SQL_DRIVER "$(AZURE_SQL_DRIVER)"
-                      -JWT_SECRET $(JWT_SECRET)
-                      -ENVIRONMENT production
-                  displayName: 'Deploy Backend - Zip Deploy'
+                - script: |
+                    mkdir -p $(Pipeline.Workspace)/profiles
+                    echo "$(backendPublishProfile)" > $(Pipeline.Workspace)/profiles/backend-publishprofile.xml
+                  displayName: 'Create Publish Profile from Variable'
 
-                - task: AzureAppServiceSettings@1
+                - task: AzureRmWebAppDeployment@4
                   inputs:
-                    azureSubscription: '$(azureSubscription)'
-                    appName: '$(backendAppName)'
-                    resourceGroupName: '$(resourceGroup)'
-                    appSettings: |
-                      [
-                        {
-                          "name": "WEBSITES_ENABLE_APP_SERVICE_STORAGE",
-                          "value": "false",
-                          "slotSetting": false
-                        },
-                        {
-                          "name": "SCM_DO_BUILD_DURING_DEPLOYMENT",
-                          "value": "true",
-                          "slotSetting": false
-                        },
-                        {
-                          "name": "PYTHON_ENABLE_GUNICORN_ONLY",
-                          "value": "true",
-                          "slotSetting": false
-                        },
-                        {
-                          "name": "PYTHON_VERSION",
-                          "value": "3.11",
-                          "slotSetting": false
-                        },
-                        {
-                          "name": "AZURE_SQL_SERVER",
-                          "value": "$(AZURE_SQL_SERVER)",
-                          "slotSetting": false
-                        },
-                        {
-                          "name": "AZURE_SQL_DATABASE",
-                          "value": "$(AZURE_SQL_DATABASE)",
-                          "slotSetting": false
-                        },
-                        {
-                          "name": "AZURE_SQL_USERNAME",
-                          "value": "$(AZURE_SQL_USERNAME)",
-                          "slotSetting": false
-                        },
-                        {
-                          "name": "AZURE_SQL_PASSWORD",
-                          "value": "$(AZURE_SQL_PASSWORD)",
-                          "slotSetting": false
-                        },
-                        {
-                          "name": "AZURE_SQL_DRIVER",
-                          "value": "ODBC Driver 17 for SQL Server",
-                          "slotSetting": false
-                        },
-                        {
-                          "name": "JWT_SECRET",
-                          "value": "$(JWT_SECRET)",
-                          "slotSetting": false
-                        },
-                        {
-                          "name": "ENVIRONMENT",
-                          "value": "production",
-                          "slotSetting": false
-                        }
-                      ]
-                  displayName: 'Configure Application Settings'
-
-                - task: AzureAppServiceManage@0
-                  inputs:
-                    azureSubscription: '$(azureSubscription)'
-                    appType: 'webAppLinux'
-                    appName: '$(backendAppName)'
-                    action: 'Restart App Service'
-                  displayName: 'Restart Backend App'
+                    ConnectionType: 'PublishProfile'
+                    PublishProfilePath: '$(Pipeline.Workspace)/profiles/backend-publishprofile.xml'
+                    PackageForLinux: '$(Pipeline.Workspace)/backend-drop/backend-*.zip'
+                    WebAppName: '$(backendAppName)'
+                  displayName: 'Deploy Backend using Publish Profile'
 
                 - script: |
                     echo "==== BACKEND DEPLOYMENT COMPLETE ===="
