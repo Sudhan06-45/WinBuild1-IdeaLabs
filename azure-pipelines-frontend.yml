@@ -70,13 +70,13 @@ stages:
             workingDirectory: 'frontend'
             displayName: 'Build React Application'
 
-          - script: |
-              if [ ! -d "$(System.DefaultWorkingDirectory)/frontend/dist" ]; then
-                echo "ERROR: Build did not create dist folder"
-                ls -la $(System.DefaultWorkingDirectory)/frontend/
+          - powershell: |
+              if (-not (Test-Path "$(System.DefaultWorkingDirectory)/frontend/dist")) {
+                Write-Host "ERROR: Build did not create dist folder"
+                Get-ChildItem -Path "$(System.DefaultWorkingDirectory)/frontend/"
                 exit 1
-              fi
-              echo "Build successful, dist folder created"
+              }
+              Write-Host "Build successful, dist folder created"
             displayName: 'Verify Build Output'
 
           - task: ArchiveFiles@2

@@ -71,13 +71,11 @@ stages:
               failTaskOnFailedTests: false
             displayName: 'Publish Test Results'
 
-          - script: |
-              mkdir -p $(Build.ArtifactStagingDirectory)/backend
-              cp -r . $(Build.ArtifactStagingDirectory)/backend/
-              cd $(Build.ArtifactStagingDirectory)/backend
-              rm -rf __pycache__ .pytest_cache venv .venv
-              find . -type d -name __pycache__ -exec rm -rf {} + || true
-            workingDirectory: 'backend'
+          - powershell: |
+              New-Item -ItemType Directory -Path "$(Build.ArtifactStagingDirectory)\backend" -Force | Out-Null
+              Copy-Item -Path "backend\*" -Destination "$(Build.ArtifactStagingDirectory)\backend\" -Recurse -Force
+              Remove-Item -Path "$(Build.ArtifactStagingDirectory)\backend\__pycache__" -Recurse -Force -ErrorAction SilentlyContinue
+              Remove-Item -Path "$(Build.ArtifactStagingDirectory)\backend\.pytest_cache" -Recurse -Force -ErrorAction SilentlyContinue
             displayName: 'Prepare Backend Files'
 
           - task: ArchiveFiles@2
