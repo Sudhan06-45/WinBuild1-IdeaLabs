@@ -120,8 +120,13 @@ stages:
                   displayName: 'Download Artifacts'
 
                 - powershell: |
-                    New-Item -ItemType Directory -Path "$(Pipeline.Workspace)\profiles" -Force
-                    "$(backendPublishProfile)" | Out-File -FilePath "$(Pipeline.Workspace)\profiles\backend-publishprofile.xml"
+                    $profilePath = "$(Pipeline.Workspace)\profiles\backend-publishprofile.xml"
+                    New-Item -ItemType Directory -Path (Split-Path $profilePath) -Force | Out-Null
+                    $profileContent = @"
+                    $(backendPublishProfile)
+                    "@
+                    [System.IO.File]::WriteAllText($profilePath, $profileContent.Trim())
+                    Write-Host "Profile created at: $profilePath"
                   displayName: 'Create Publish Profile from Variable'
 
                 - task: AzureRmWebAppDeployment@4
