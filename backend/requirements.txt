@@ -1,0 +1,37 @@
+# FastAPI and Server
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+python-multipart>=0.0.6
+
+# Database
+sqlalchemy>=2.0.0
+aiosqlite>=0.19.0  # For local development
+# aioodbc>=0.5.0  # Uncomment for Azure SQL
+
+# Authentication
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+
+# Pydantic
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+
+# Azure OpenAI / OpenAI
+openai>=1.0.0
+
+# File parsing
+python-docx>=0.8.11
+pypdf>=3.0.0
+
+# HTTP Client
+httpx>=0.26.0
+requests>=2.31.0
+
+# Environment
+python-dotenv>=1.0.0
+
+# PDF Generation (optional)
+reportlab>=4.0.0
+
+# Utilities
+aiofiles>=23.2.1

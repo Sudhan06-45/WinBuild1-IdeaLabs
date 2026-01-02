@@ -1,0 +1,439 @@
+# Azure DevOps CI/CD Pipeline for SQA Management System
+# Deployment using Publish Profiles
+# This pipeline builds backend and frontend, then deploys to Azure Web Apps
+
+trigger:
+  branches:
+    include:
+      - main
+      - develop
+  paths:
+    include:
+      - backend/**
+      - frontend/**
+      - deployment/**
+      - azure-pipelines.yml
+
+pr:
+  branches:
+    include:
+      - main
+      - develop
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  - group: sqa-backend-vars
+  buildConfiguration: 'Release'
+  backendAppName: 'sqa-backend-app-idealabs'
+  frontendAppName: 'sqa-frontend-app-idealabs'
+  resourceGroup: 'sqa-management-rg'
+  azureSubscription: 'Azure-SQA-Connection'
+
+stages:
+  # ============================================
+  # BUILD STAGE - Compile and Package
+  # ============================================
+  - stage: Build
+    displayName: 'Build Applications'
+    jobs:
+      # Backend Build Job
+      - job: BuildBackend
+        displayName: 'Build Backend (FastAPI)'
+        steps:
+          - checkout: self
+            fetchDepth: 0
+
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: '3.11'
+              addToPath: true
+            displayName: 'Use Python 3.11'
+
+          - script: |
+              python -m pip install --upgrade pip
+              pip install -r requirements.txt
+            workingDirectory: 'backend'
+            displayName: 'Install Python Dependencies'
+
+          - script: |
+              pip install pytest pytest-asyncio
+              python -m pytest tests/ -v --junitxml=junit/test-results.xml || true
+            workingDirectory: 'backend'
+            condition: succeeded()
+            displayName: 'Run Python Tests (Optional)'
+            continueOnError: true
+
+          - task: PublishTestResults@2
+            condition: succeeded()
+            inputs:
+              testResultsFormat: 'JUnit'
+              testResultsFiles: '**/junit/test-results.xml'
+              failTaskOnFailedTests: false
+            displayName: 'Publish Test Results'
+
+          - script: |
+              mkdir -p $(Build.ArtifactStagingDirectory)/backend
+              cp -r . $(Build.ArtifactStagingDirectory)/backend/
+              cd $(Build.ArtifactStagingDirectory)/backend
+              rm -rf __pycache__ .pytest_cache venv .venv
+              find . -type d -name __pycache__ -exec rm -rf {} + || true
+            workingDirectory: 'backend'
+            displayName: 'Copy Backend Files for Packaging'
+
+          - task: ArchiveFiles@2
+            inputs:
+              rootFolderOrFile: '$(Build.ArtifactStagingDirectory)/backend'
+              includeRootFolder: false
+              archiveType: 'zip'
+              archiveFile: '$(Build.ArtifactStagingDirectory)/backend-$(Build.BuildId).zip'
+              replaceExistingArchive: true
+            displayName: 'Archive Backend'
+
+      # Frontend Build Job
+      - job: BuildFrontend
+        displayName: 'Build Frontend (React)'
+        steps:
+          - checkout: self
+
+          - task: NodeTool@0
+            inputs:
+              versionSpec: '20.x'
+              addToPath: true
+            displayName: 'Install Node.js 20.x'
+
+          - script: |
+              npm --version
+              node --version
+            displayName: 'Check Node/NPM Versions'
+
+          - script: |
+              npm install
+            workingDirectory: 'frontend'
+            displayName: 'Install Node Dependencies'
+
+          - script: |
+              npm run lint || true
+            workingDirectory: 'frontend'
+            displayName: 'Run Linter (Optional)'
+            continueOnError: true
+
+          - script: |
+              npm run build
+            workingDirectory: 'frontend'
+            displayName: 'Build React Application'
+
+          - script: |
+              if [ ! -d "$(System.DefaultWorkingDirectory)/frontend/dist" ]; then
+                echo "ERROR: Build did not create dist folder"
+                ls -la $(System.DefaultWorkingDirectory)/frontend/
+                exit 1
+              fi
+              echo "Build successful, dist folder created"
+            displayName: 'Verify Build Output'
+
+          - task: ArchiveFiles@2
+            inputs:
+              rootFolderOrFile: '$(System.DefaultWorkingDirectory)/frontend/dist'
+              includeRootFolder: false
+              archiveType: 'zip'
+              archiveFile: '$(Build.ArtifactStagingDirectory)/frontend-$(Build.BuildId).zip'
+              replaceExistingArchive: true
+            displayName: 'Archive Frontend'
+
+      # Prepare Publish Profile Secure Files
+      - job: PrepareSecureFiles
+        displayName: 'Prepare Publish Profiles'
+        steps:
+          - task: DownloadSecureFile@1
+            name: BackendPublishProfile
+            inputs:
+              secureFile: 'backend-publish-profile.xml'
+            displayName: 'Download Backend Publish Profile'
+            continueOnError: true
+
+          - task: DownloadSecureFile@1
+            name: FrontendPublishProfile
+            inputs:
+              secureFile: 'frontend-publish-profile.xml'
+            displayName: 'Download Frontend Publish Profile'
+            continueOnError: true
+
+          - script: |
+              cp $(BackendPublishProfile.secureFilePath) $(Build.ArtifactStagingDirectory)/backend-publish-profile.xml || true
+              cp $(FrontendPublishProfile.secureFilePath) $(Build.ArtifactStagingDirectory)/frontend-publish-profile.xml || true
+              ls -la $(Build.ArtifactStagingDirectory)/
+            displayName: 'Copy Publish Profiles to Artifacts'
+
+      # Publish All Artifacts
+      - job: PublishArtifacts
+        displayName: 'Publish Build Artifacts'
+        dependsOn:
+          - BuildBackend
+          - BuildFrontend
+          - PrepareSecureFiles
+        condition: succeeded()
+        steps:
+          - task: PublishBuildArtifacts@1
+            inputs:
+              pathToPublish: '$(Build.ArtifactStagingDirectory)'
+              artifactName: 'build-artifacts'
+              publishLocation: 'Container'
+            displayName: 'Publish Artifacts to Pipeline'
+
+  # ============================================
+  # DEPLOY STAGE - Deploy to Azure Web Apps
+  # ============================================
+  - stage: Deploy
+    displayName: 'Deploy to Azure'
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      # Deploy Backend to Azure Web App
+      - deployment: DeployBackend
+        displayName: 'Deploy Backend to Azure Web App'
+        environment: 'Production'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: DownloadBuildArtifacts@1
+                  inputs:
+                    buildType: 'current'
+                    downloadType: 'single'
+                    artifactName: 'build-artifacts'
+                    downloadPath: '$(Pipeline.Workspace)'
+                  displayName: 'Download Build Artifacts'
+
+                - script: |
+                    ls -la $(Pipeline.Workspace)/build-artifacts/
+                  displayName: 'List Artifacts'
+
+                - task: DownloadSecureFile@1
+                  name: BackendPublishProfile
+                  inputs:
+                    secureFile: 'backend-publish-profile.xml'
+                  displayName: 'Download Backend Publish Profile'
+
+                - task: AzureWebApp@1
+                  inputs:
+                    azureSubscription: '$(azureSubscription)'
+                    appType: 'webAppLinux'
+                    appName: '$(backendAppName)'
+                    package: '$(Pipeline.Workspace)/build-artifacts/backend-*.zip'
+                    deploymentMethod: 'zipDeploy'
+                    appSettings: |
+                      -WEBSITES_ENABLE_APP_SERVICE_STORAGE false
+                      -SCM_DO_BUILD_DURING_DEPLOYMENT true
+                      -PYTHON_ENABLE_GUNICORN_ONLY true
+                      -PYTHON_VERSION 3.11
+                      -AZURE_SQL_SERVER $(AZURE_SQL_SERVER)
+                      -AZURE_SQL_DATABASE $(AZURE_SQL_DATABASE)
+                      -AZURE_SQL_USERNAME $(AZURE_SQL_USERNAME)
+                      -AZURE_SQL_PASSWORD $(AZURE_SQL_PASSWORD)
+                      -AZURE_SQL_DRIVER "$(AZURE_SQL_DRIVER)"
+                      -JWT_SECRET $(JWT_SECRET)
+                      -ENVIRONMENT production
+                  displayName: 'Deploy Backend - Zip Deploy + Configure Settings'
+
+                - task: AzureAppServiceSettings@1
+                  inputs:
+                    azureSubscription: '$(azureSubscription)'
+                    appName: '$(backendAppName)'
+                    resourceGroupName: '$(resourceGroup)'
+                    appSettings: |
+                      [
+                        {
+                          "name": "WEBSITES_ENABLE_APP_SERVICE_STORAGE",
+                          "value": "false",
+                          "slotSetting": false
+                        },
+                        {
+                          "name": "SCM_DO_BUILD_DURING_DEPLOYMENT",
+                          "value": "true",
+                          "slotSetting": false
+                        },
+                        {
+                          "name": "PYTHON_ENABLE_GUNICORN_ONLY",
+                          "value": "true",
+                          "slotSetting": false
+                        },
+                        {
+                          "name": "PYTHON_VERSION",
+                          "value": "3.11",
+                          "slotSetting": false
+                        },
+                        {
+                          "name": "AZURE_SQL_SERVER",
+                          "value": "$(AZURE_SQL_SERVER)",
+                          "slotSetting": false
+                        },
+                        {
+                          "name": "AZURE_SQL_DATABASE",
+                          "value": "$(AZURE_SQL_DATABASE)",
+                          "slotSetting": false
+                        },
+                        {
+                          "name": "AZURE_SQL_USERNAME",
+                          "value": "$(AZURE_SQL_USERNAME)",
+                          "slotSetting": false
+                        },
+                        {
+                          "name": "AZURE_SQL_PASSWORD",
+                          "value": "$(AZURE_SQL_PASSWORD)",
+                          "slotSetting": false
+                        },
+                        {
+                          "name": "AZURE_SQL_DRIVER",
+                          "value": "ODBC Driver 17 for SQL Server",
+                          "slotSetting": false
+                        },
+                        {
+                          "name": "JWT_SECRET",
+                          "value": "$(JWT_SECRET)",
+                          "slotSetting": false
+                        },
+                        {
+                          "name": "ENVIRONMENT",
+                          "value": "production",
+                          "slotSetting": false
+                        }
+                      ]
+                    generalSettings: |
+                      [
+                        {
+                          "name": "pythonVersion",
+                          "value": "3.11"
+                        }
+                      ]
+                  displayName: 'Configure Backend Application Settings'
+
+                - task: AzureAppServiceManage@0
+                  inputs:
+                    azureSubscription: '$(azureSubscription)'
+                    appType: 'webAppLinux'
+                    appName: '$(backendAppName)'
+                    action: 'Restart App Service'
+                  displayName: 'Restart Backend App Service'
+
+      # Deploy Frontend to Azure Web App
+      - deployment: DeployFrontend
+        displayName: 'Deploy Frontend to Azure Web App'
+        environment: 'Production'
+        dependsOn: DeployBackend
+        condition: succeeded()
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: DownloadBuildArtifacts@1
+                  inputs:
+                    buildType: 'current'
+                    downloadType: 'single'
+                    artifactName: 'build-artifacts'
+                    downloadPath: '$(Pipeline.Workspace)'
+                  displayName: 'Download Build Artifacts'
+
+                - task: DownloadSecureFile@1
+                  name: FrontendPublishProfile
+                  inputs:
+                    secureFile: 'frontend-publish-profile.xml'
+                  displayName: 'Download Frontend Publish Profile'
+
+                - task: AzureWebApp@1
+                  inputs:
+                    azureSubscription: '$(azureSubscription)'
+                    appType: 'webAppLinux'
+                    appName: '$(frontendAppName)'
+                    package: '$(Pipeline.Workspace)/build-artifacts/frontend-*.zip'
+                    deploymentMethod: 'zipDeploy'
+                    appSettings: |
+                      -WEBSITES_ENABLE_APP_SERVICE_STORAGE false
+                      -NODE_ENV production
+                      -VITE_API_URL https://$(backendAppName).azurewebsites.net/api
+                  displayName: 'Deploy Frontend - Zip Deploy'
+
+                - task: AzureAppServiceSettings@1
+                  inputs:
+                    azureSubscription: '$(azureSubscription)'
+                    appName: '$(frontendAppName)'
+                    resourceGroupName: '$(resourceGroup)'
+                    appSettings: |
+                      [
+                        {
+                          "name": "WEBSITES_ENABLE_APP_SERVICE_STORAGE",
+                          "value": "false",
+                          "slotSetting": false
+                        },
+                        {
+                          "name": "NODE_ENV",
+                          "value": "production",
+                          "slotSetting": false
+                        },
+                        {
+                          "name": "VITE_API_URL",
+                          "value": "https://$(backendAppName).azurewebsites.net/api",
+                          "slotSetting": false
+                        }
+                      ]
+                  displayName: 'Configure Frontend Application Settings'
+
+                - task: AzureAppServiceManage@0
+                  inputs:
+                    azureSubscription: '$(azureSubscription)'
+                    appType: 'webAppLinux'
+                    appName: '$(frontendAppName)'
+                    action: 'Restart App Service'
+                  displayName: 'Restart Frontend App Service'
+
+      # Post-Deployment Verification
+      - job: VerifyDeployment
+        displayName: 'Verify Deployment'
+        dependsOn:
+          - DeployBackend
+          - DeployFrontend
+        condition: succeeded()
+        steps:
+          - script: |
+              echo "==== DEPLOYMENT SUMMARY ===="
+              echo "Backend URL: https://$(backendAppName).azurewebsites.net"
+              echo "Frontend URL: https://$(frontendAppName).azurewebsites.net"
+              echo "API Docs: https://$(backendAppName).azurewebsites.net/docs"
+              echo ""
+              echo "Testing Backend Health..."
+              for i in {1..30}; do
+                status=$(curl -s -o /dev/null -w "%{http_code}" https://$(backendAppName).azurewebsites.net/health || echo "000")
+                if [ "$status" = "200" ]; then
+                  echo "✅ Backend is healthy (HTTP $status)"
+                  break
+                else
+                  echo "⏳ Waiting for backend... (attempt $i/30, HTTP $status)"
+                  sleep 2
+                fi
+              done
+            displayName: 'Verify Backend Deployment'
+            continueOnError: true
+
+          - script: |
+              echo ""
+              echo "Testing Frontend..."
+              for i in {1..30}; do
+                status=$(curl -s -o /dev/null -w "%{http_code}" https://$(frontendAppName).azurewebsites.net/ || echo "000")
+                if [ "$status" = "200" ]; then
+                  echo "✅ Frontend is live (HTTP $status)"
+                  break
+                else
+                  echo "⏳ Waiting for frontend... (attempt $i/30, HTTP $status)"
+                  sleep 2
+                fi
+              done
+            displayName: 'Verify Frontend Deployment'
+            continueOnError: true
+
+          - script: |
+              echo ""
+              echo "==== NEXT STEPS ===="
+              echo "1. Visit https://$(frontendAppName).azurewebsites.net to access the app"
+              echo "2. API Documentation: https://$(backendAppName).azurewebsites.net/docs"
+              echo "3. Check logs in Azure Portal → App Service → Log stream"
+            displayName: 'Deployment Complete'
