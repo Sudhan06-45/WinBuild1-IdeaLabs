@@ -21,7 +21,7 @@ pr:
       - frontend/**
 
 pool:
-  vmImage: 'ubuntu-latest'
+  vmImage: 'windows-latest'
 
 variables:
   - group: sqa-backend-vars
