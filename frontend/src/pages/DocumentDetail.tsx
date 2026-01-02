@@ -4,7 +4,6 @@ import { motion } from 'framer-motion'
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
 import {
-  FileText,
   ArrowLeft,
   Download,
   Trash2,

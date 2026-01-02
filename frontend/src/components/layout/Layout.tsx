@@ -8,7 +8,6 @@ import {
   Code2,
   FileCheck,
   TestTube2,
-  FileText,
   LogOut,
   Menu,
   X,

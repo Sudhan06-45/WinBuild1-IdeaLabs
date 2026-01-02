@@ -63,7 +63,7 @@ export default function Requirements() {
       return agentsApi.validateRequirement(payload)
     },
     onSuccess: (data) => {
-      setResult(data as ValidationResult)
+      setResult(data as unknown as ValidationResult)
       toast.success('Validation completed!')
     },
     onError: (error: unknown) => {

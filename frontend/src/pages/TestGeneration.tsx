@@ -75,7 +75,7 @@ export default function TestGeneration() {
       return agentsApi.generateTests({ code, filename, test_count: testCount })
     },
     onSuccess: (data) => {
-      setResult(data as TestResult)
+      setResult(data as unknown as TestResult)
       toast.success('Test cases generated!')
     },
     onError: (error: unknown) => {

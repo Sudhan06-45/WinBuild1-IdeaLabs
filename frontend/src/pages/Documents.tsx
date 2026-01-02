@@ -56,8 +56,8 @@ export default function Documents() {
       // Load documents
       let docsData: Document[] = []
       try {
-        const docsResponse = await documentsApi.list(50)
-        docsData = Array.isArray(docsResponse) ? docsResponse : (docsResponse?.data || [])
+        const docsResponse = await documentsApi.list(50 as unknown as string)
+        docsData = Array.isArray(docsResponse) ? docsResponse : ((docsResponse as any)?.data || [])
       } catch (e) {
         console.log('No documents yet')
       }
@@ -65,8 +65,8 @@ export default function Documents() {
       // Load executions
       let execsData: AgentExecution[] = []
       try {
-        const execsResponse = await agentsApi.getHistory(50)
-        execsData = Array.isArray(execsResponse) ? execsResponse : (execsResponse?.data || [])
+        const execsResponse = await agentsApi.getHistory(50 as unknown as string)
+        execsData = Array.isArray(execsResponse) ? execsResponse : ((execsResponse as any)?.data || [])
       } catch (e) {
         console.log('No executions yet')
       }

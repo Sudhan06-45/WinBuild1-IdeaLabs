@@ -6,7 +6,6 @@ import {
   Code2,
   FileCheck,
   TestTube2,
-  FileText,
   TrendingUp,
   Clock,
   CheckCircle2,

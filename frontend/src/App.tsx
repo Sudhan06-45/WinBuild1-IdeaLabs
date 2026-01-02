@@ -8,8 +8,6 @@ import Dashboard from './pages/Dashboard'
 import CodeAnalysis from './pages/CodeAnalysis'
 import Requirements from './pages/Requirements'
 import TestGeneration from './pages/TestGeneration'
-import Documents from './pages/Documents'
-import DocumentDetail from './pages/DocumentDetail'
 
 // Layout
 import Layout from './components/layout/Layout'

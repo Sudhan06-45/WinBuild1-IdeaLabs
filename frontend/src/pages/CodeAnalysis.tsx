@@ -11,8 +11,7 @@ import {
   CheckCircle,
   XCircle,
   Loader2,
-  Copy,
-  Download
+  Copy
 } from 'lucide-react'
 import { agentsApi } from '../services/api'
 
@@ -66,7 +65,7 @@ export default function CodeAnalysis() {
       return agentsApi.analyzeCode({ code, filename })
     },
     onSuccess: (data) => {
-      setResult(data as AnalysisResult)
+      setResult(data as unknown as AnalysisResult)
       toast.success('Analysis completed!')
     },
     onError: (error: unknown) => {
