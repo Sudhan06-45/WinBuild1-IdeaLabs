@@ -24,9 +24,9 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
+  - group: sqa-backend-vars
   frontendAppName: 'SQA-Management-frontend'
   nodeVersion: '20.x'
-  - group: sqa-backend-vars
 
 stages:
   # ============================================

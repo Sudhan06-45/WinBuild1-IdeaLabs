@@ -24,9 +24,9 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
+  - group: sqa-backend-vars
   backendAppName: 'SQA-Mangement-backend'
   pythonVersion: '3.11'
-  - group: sqa-backend-vars
 
 stages:
   # ============================================
