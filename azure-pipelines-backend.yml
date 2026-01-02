@@ -117,11 +117,22 @@ stages:
                     downloadPath: '$(Pipeline.Workspace)'
                   displayName: 'Download Artifacts'
 
-                - task: AzureRmWebAppDeployment@4
+                - powershell: |
+                    [xml]$publishProfile = Get-Content "$(Build.SourcesDirectory)\backend-publishprofile.xml"
+                    $password = $publishProfile.publishData.publishProfile[0].userPWD
+                    Write-Host "##vso[task.setvariable variable=publishPassword;issecret=true]$password"
+                  displayName: 'Extract Publish Profile Password'
+
+                - task: AzureWebApp@1
                   inputs:
-                    ConnectionType: 'PublishProfile'
-                    PublishProfilePath: '$(Build.SourcesDirectory)\backend-publishprofile.xml'
-                    PackageForLinux: '$(Pipeline.Workspace)\backend-drop\backend-*.zip'
+                    azureSubscription: ''
+                    appType: 'webAppLinux'
+                    appName: 'SQA-Mangement-backend'
+                    package: '$(Pipeline.Workspace)/backend-drop/backend-*.zip'
+                    deploymentMethod: 'zipDeploy'
+                  env:
+                    AZURE_WEB_APP_PUBLISH_PROFILE: '$(Build.SourcesDirectory)\backend-publishprofile.xml'
+                    AZURE_WEB_APP_PUBLISH_PASSWORD: '$(publishPassword)'
                   displayName: 'Deploy Backend using Publish Profile'
 
                 - powershell: |
