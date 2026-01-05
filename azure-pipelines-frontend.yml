@@ -133,14 +133,28 @@ stages:
                     Write-Host "##vso[task.setvariable variable=publishPassword;issecret=true]$password"
                   displayName: 'Extract Publish Profile Password'
 
-                - task: AzureRmWebAppDeployment@4
-                  inputs:
-                    ConnectionType: 'PublishProfile'
-                    PublishProfilePath: '$(frontendProfile.secureFilePath)'
-                    PublishProfilePassword: '$(publishPassword)'
-                    WebAppName: 'SQA-Management-frontend'
-                    packageForLinux: '$(Pipeline.Workspace)\frontend-drop\frontend-*.zip'
-                    AppSettings: '-VITE_API_URL "$(backendApiUrl)"'
+                - powershell: |
+                    $profilePath = "$(frontendProfile.secureFilePath)"
+                    [xml]$profile = Get-Content $profilePath
+                    $publishUrl = $profile.publishData.publishProfile[0].publishUrl
+                    $username = $profile.publishData.publishProfile[0].userName
+                    $password = $profile.publishData.publishProfile[0].userPWD
+                    
+                    $zipFile = Get-ChildItem -Path "$(Pipeline.Workspace)\frontend-drop\frontend-*.zip" | Select-Object -First 1
+                    Write-Host "Deploying: $($zipFile.FullName)"
+                    Write-Host "To: https://$publishUrl/api/zipdeploy"
+                    
+                    $base64Auth = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("$username`:$password"))
+                    $headers = @{ Authorization = "Basic $base64Auth" }
+                    
+                    Invoke-RestMethod -Uri "https://$publishUrl/api/zipdeploy" `
+                      -Method POST `
+                      -InFile $zipFile.FullName `
+                      -ContentType "application/zip" `
+                      -Headers $headers `
+                      -TimeoutSec 600
+                    
+                    Write-Host "Deployment completed successfully!"
                   displayName: 'Deploy Frontend using Publish Profile'
 
                 - powershell: |
