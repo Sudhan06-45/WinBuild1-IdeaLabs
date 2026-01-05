@@ -55,7 +55,9 @@ async def init_db():
         engine = create_async_engine(
             database_url,
             echo=settings.DEBUG,
-            future=True
+            future=True,
+            pool_pre_ping=True,  # Verify connections before using
+            pool_recycle=3600    # Recycle connections after 1 hour
         )
         
         async_session_factory = async_sessionmaker(
@@ -64,17 +66,23 @@ async def init_db():
             expire_on_commit=False
         )
         
-        # Create tables
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
+        # Try to create tables, but don't fail if it doesn't work
+        try:
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+            print("✅ Database tables created/verified")
+        except Exception as table_error:
+            print(f"⚠️ Could not create tables (will retry on first request): {table_error}")
+            logger.warning(f"Could not create tables on startup: {table_error}")
         
         print("✅ Database connection established")
         logger.info("✅ Database connection established")
         
     except Exception as e:
-        print(f"❌ Database connection failed: {e}")
-        logger.error(f"❌ Database connection failed: {e}")
-        raise
+        print(f"⚠️ Database connection failed (app will start anyway): {e}")
+        logger.warning(f"Database connection failed on startup: {e}")
+        # Don't raise - allow app to start without database
+        # Database will be retried on first actual use
 
 
 async def close_db():
