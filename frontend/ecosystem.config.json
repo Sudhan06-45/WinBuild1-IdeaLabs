@@ -1,0 +1,10 @@
+[
+  {
+    "name": "sqa-frontend",
+    "script": "serve",
+    "args": "dist -s -l 8080",
+    "env": {
+      "NODE_ENV": "production"
+    }
+  }
+]
