@@ -134,16 +134,62 @@ stages:
                     Write-Host "To: https://$publishUrl/api/zipdeploy"
                     
                     $base64Auth = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("$username`:$password"))
-                    $headers = @{ Authorization = "Basic $base64Auth" }
+                    $headers = @{ 
+                        Authorization = "Basic $base64Auth"
+                    }
                     
-                    Invoke-RestMethod -Uri "https://$publishUrl/api/zipdeploy" `
-                      -Method POST `
-                      -InFile $zipFile.FullName `
-                      -ContentType "application/zip" `
-                      -Headers $headers `
-                      -TimeoutSec 600
+                    # Use async deployment to avoid timeout
+                    Write-Host "Starting async deployment..."
+                    try {
+                        $response = Invoke-WebRequest -Uri "https://$publishUrl/api/zipdeploy?isAsync=true" `
+                          -Method POST `
+                          -InFile $zipFile.FullName `
+                          -ContentType "application/zip" `
+                          -Headers $headers `
+                          -TimeoutSec 300 `
+                          -UseBasicParsing
+                        
+                        # Get deployment status URL from Location header
+                        $statusUrl = $response.Headers['Location']
+                        Write-Host "Deployment started. Status URL: $statusUrl"
+                        
+                        # Poll for completion
+                        $maxAttempts = 60
+                        $attempt = 0
+                        $completed = $false
+                        
+                        while (-not $completed -and $attempt -lt $maxAttempts) {
+                            Start-Sleep -Seconds 10
+                            $attempt++
+                            
+                            try {
+                                $status = Invoke-RestMethod -Uri $statusUrl -Headers $headers -Method GET
+                                Write-Host "Deployment status: $($status.status) (attempt $attempt/$maxAttempts)"
+                                
+                                if ($status.status -eq 4) {
+                                    Write-Host "Deployment completed successfully!"
+                                    $completed = $true
+                                } elseif ($status.status -eq 3) {
+                                    Write-Host "##[error]Deployment failed!"
+                                    Write-Host "Error details: $($status.message)"
+                                    exit 1
+                                }
+                            } catch {
+                                Write-Host "Checking status... (attempt $attempt)"
+                            }
+                        }
+                        
+                        if (-not $completed) {
+                            Write-Host "##[warning]Deployment is still in progress after 10 minutes. Check Azure Portal for status."
+                        }
+                        
+                    } catch {
+                        Write-Host "##[error]Deployment failed: $_"
+                        Write-Host "Error details: $($_.Exception.Message)"
+                        exit 1
+                    }
                     
-                    Write-Host "Deployment completed successfully!"
+                    Write-Host "Deployment process completed!"
                   displayName: 'Deploy Backend using Publish Profile'
 
                 - powershell: |
