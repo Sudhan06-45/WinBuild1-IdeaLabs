@@ -1,5 +1,5 @@
 # Frontend Pipeline - Auto-runs on frontend code changes
-# Deploys to: SQA-Management-frontend Web App Service
+# Deploys to: SQA-FE Web App Service (RG-WinBuild1-IdeaLabs)
 
 trigger:
   branches:
@@ -26,9 +26,11 @@ pool:
 variables:
   - group: sqa-backend-vars
   - name: frontendAppName
-    value: 'SQA-Management-frontend'
+    value: 'SQA-FE'
   - name: nodeVersion
     value: '20.x'
+  - name: backendApiUrl
+    value: 'https://SQA-Mangement-backend.azurewebsites.net'
 
 stages:
   # ============================================
@@ -65,7 +67,8 @@ stages:
             displayName: 'Run Linter (Optional)'
             continueOnError: true
 
-          - script: |
+          - powershell: |
+              $env:VITE_API_URL = "$(backendApiUrl)"
               npm run build
             workingDirectory: 'frontend'
             displayName: 'Build React Application'
@@ -129,8 +132,9 @@ stages:
                     ConnectionType: 'PublishProfile'
                     PublishProfilePath: '$(Build.SourcesDirectory)\frontend-publishprofile.xml'
                     PublishProfilePassword: '$(publishPassword)'
-                    WebAppName: 'SQA-Management-frontend'
+                    WebAppName: 'SQA-FE'
                     packageForLinux: '$(Pipeline.Workspace)\frontend-drop\frontend-*.zip'
+                    AppSettings: '-VITE_API_URL "$(backendApiUrl)"'
                   displayName: 'Deploy Frontend using Publish Profile'
 
                 - powershell: |
