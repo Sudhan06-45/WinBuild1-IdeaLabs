@@ -26,7 +26,7 @@ pool:
 variables:
   - group: sqa-backend-vars
   - name: frontendAppName
-    value: 'SQA-FE'
+    value: 'SQA-Management-frontend'
   - name: nodeVersion
     value: '20.x'
   - name: backendApiUrl
@@ -121,8 +121,14 @@ stages:
                     downloadPath: '$(Pipeline.Workspace)'
                   displayName: 'Download Artifacts'
 
+                - task: DownloadSecureFile@1
+                  name: frontendProfile
+                  inputs:
+                    secureFile: frontend-publishprofile.xml
+
                 - powershell: |
-                    [xml]$publishProfile = Get-Content "$(Build.SourcesDirectory)\frontend-publishprofile.xml"
+                    $profilePath = "$(frontendProfile.secureFilePath)"
+                    [xml]$publishProfile = Get-Content $profilePath
                     $password = $publishProfile.publishData.publishProfile[0].userPWD
                     Write-Host "##vso[task.setvariable variable=publishPassword;issecret=true]$password"
                   displayName: 'Extract Publish Profile Password'
@@ -130,9 +136,9 @@ stages:
                 - task: AzureRmWebAppDeployment@4
                   inputs:
                     ConnectionType: 'PublishProfile'
-                    PublishProfilePath: '$(Build.SourcesDirectory)\frontend-publishprofile.xml'
+                    PublishProfilePath: '$(frontendProfile.secureFilePath)'
                     PublishProfilePassword: '$(publishPassword)'
-                    WebAppName: 'SQA-FE'
+                    WebAppName: 'SQA-Management-frontend'
                     packageForLinux: '$(Pipeline.Workspace)\frontend-drop\frontend-*.zip'
                     AppSettings: '-VITE_API_URL "$(backendApiUrl)"'
                   displayName: 'Deploy Frontend using Publish Profile'
