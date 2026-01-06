@@ -21,11 +21,10 @@ from api.health import router as health_router
 async def lifespan(app: FastAPI):
     """Application lifespan manager"""
     print("🚀 Starting SQA Management System API...")
-    # Temporarily disabled for debugging
-    # await init_db()
+    await init_db()
     yield
     print("👋 Shutting down...")
-    # await close_db()
+    await close_db()
 
 
 # Create FastAPI app
