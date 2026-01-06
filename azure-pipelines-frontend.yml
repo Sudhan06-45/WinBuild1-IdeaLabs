@@ -6,6 +6,7 @@ trigger:
     include:
       - main
       - develop
+      - prod
   paths:
     include:
       - frontend/**
@@ -30,7 +31,7 @@ variables:
   - name: nodeVersion
     value: '20.x'
   - name: backendApiUrl
-    value: 'https://SQA-Mangement-backend.azurewebsites.net'
+    value: 'https://sqa-mangement-backend.azurewebsites.net'
 
 stages:
   # ============================================
